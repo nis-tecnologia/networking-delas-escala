@@ -451,7 +451,7 @@ async function sbFetch(path, opts={}){
 const sbGet=(table,params='')=>sbFetch(table+'?'+params);
 const sbPost=(table,body)=>sbFetch(table,{method:'POST',body:JSON.stringify(body)});
 const sbPatch=(table,params,body)=>sbFetch(table+'?'+params,{method:'PATCH',headers:{'Prefer':'return=representation'},body:JSON.stringify(body)});
-const sbDelete=(table,params)=>sbFetch(table+'?'+params,{method:'DELETE',headers:{'Prefer':'return=minimal'}});
+const sbDelete=(table,params)=>sbFetch(table+'?'+params,{method:'DELETE',headers:{'Prefer':'return=minimal','Content-Type':'application/json'}});
 const sbUpsert=(table,body,onConflict)=>sbFetch(table,{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=representation'},body:JSON.stringify(body)});
 
 // ── HELPERS ──
@@ -598,9 +598,12 @@ async function adminAddPessoa(){
 async function adminDelPessoa(id,nm){
   showGenConf('🗑 Remover participante','Tem certeza que deseja remover <strong>'+nm+'</strong>?',async function(){
     showLoading('Removendo...');
-    await sbDelete('nd_participantes','id=eq.'+id);
-    await loadParticipantes();buildNomeSelect();renderAdminList();
-    hideLoading();showToast('Participante removida!');
+    try{
+      await sbDelete('nd_participantes','id=eq.'+id);
+      await loadParticipantes();buildNomeSelect();renderAdminList();
+      showToast('Participante removida!');
+    }catch(e){showToast('Erro ao remover.');}
+    hideLoading();
   });
 }
 function renderAdminList(){
@@ -773,8 +776,8 @@ async function adminLimparDados(){
   showGenConf('🗑 Limpar agendamentos','Isso vai apagar <strong>todos os agendamentos</strong> de abertura e nichos de todas as semanas.',async function(){
     showLoading('Limpando...');
     await Promise.all([
-      sbDelete('nd_abertura','id=neq.00000000-0000-0000-0000-000000000000'),
-      sbDelete('nd_nichos','id=neq.00000000-0000-0000-0000-000000000000')
+      sbFetch('nd_abertura?semana_inicio=gte.2020-01-01',{method:'DELETE',headers:{'Prefer':'return=minimal','Content-Type':'application/json'}}),
+      sbFetch('nd_nichos?semana_inicio=gte.2020-01-01',{method:'DELETE',headers:{'Prefer':'return=minimal','Content-Type':'application/json'}})
     ]);
     await loadWeekData(curWk);renderAll();
     hideLoading();showToast('Agendamentos limpos!');
@@ -879,7 +882,7 @@ async function confirmAgendamento(){
 }
 async function cancelAb(day,turno){
   showLoading('Cancelando...');
-  await sbDelete('nd_abertura','semana_inicio=eq.'+curWk+'&dia=eq.'+encodeURIComponent(day)+'&turno=eq.'+turno);
+  await sbFetch('nd_abertura?semana_inicio=eq.'+curWk+'&dia=eq.'+encodeURIComponent(day)+'&turno=eq.'+encodeURIComponent(turno),{method:'DELETE',headers:{'Prefer':'return=minimal','Content-Type':'application/json'}});
   delete aberturaDB[day+'_'+turno];
   hideLoading();renderAb();updateStats();showToast('Agendamento cancelado.');
 }
@@ -921,7 +924,7 @@ async function toggleNiCell(eixo,day,hi,di){
   const picked=nichosDB[cellKey]||[];
   if(picked.includes(user.name)){
     showLoading('Cancelando...');
-    await sbDelete('nd_nichos','semana_inicio=eq.'+curWk+'&cell_key=eq.'+encodeURIComponent(cellKey)+'&nome_participante=eq.'+encodeURIComponent(user.name));
+    await sbFetch('nd_nichos?semana_inicio=eq.'+curWk+'&cell_key=eq.'+encodeURIComponent(cellKey)+'&nome_participante=eq.'+encodeURIComponent(user.name),{method:'DELETE',headers:{'Prefer':'return=minimal','Content-Type':'application/json'}});
     nichosDB[cellKey]=picked.filter(n=>n!==user.name);
     hideLoading();renderNi();updateStats();showToast('Nicho cancelado.');
   } else {
