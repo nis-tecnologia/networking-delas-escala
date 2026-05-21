@@ -428,7 +428,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 <script>
 const SB_URL='https://bovdaatuqwnkvaooczfd.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvdmRhYXR1cXdua3Zhb29jemZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNjc2NjMsImV4cCI6MjA5NDg0MzY2M30.llXh_DCZHSwgN-ka8TfNveozfkTnvVLmLOLrrQgwhHc';
+const SB_KEY='sb_publishable_6S3ZxXSxeMhos8NHZJMb-w_R7hyyOCH';
 const ADMIN_PWD='HKP.NTD2026';
 const DAYS=['Segunda','Terça','Quarta','Quinta','Sexta'];
 const EIXO_HORAS={base:['07h','08h','09h','11h'],expansao:['13h','14h','15h','16h'],sustentacao:['18h','19h','20h','21h']};
@@ -440,13 +440,36 @@ let pendingAction=null, pendingICS=null;
 
 // ── SUPABASE API ──
 async function sbFetch(path, opts={}){
-  const res = await fetch(SB_URL+'/rest/v1/'+path, {
-    headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation','x-client-info':'networking-delas/1.0',...(opts.headers||{})},
-    ...opts
-  });
-  if(!res.ok){const e=await res.text();console.error('SB error:',e);throw new Error(e);}
-  const txt=await res.text();
-  try{return txt?JSON.parse(txt):[]}catch(e){return []}
+  const method = opts.method || 'GET';
+  const customHeaders = opts.headers || {};
+  // Default Prefer based on method
+  const defaultPrefer = method==='GET' ? '' : 'return=minimal';
+  const headers = {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer '+SB_KEY,
+    'Content-Type': 'application/json',
+    ...(defaultPrefer ? {'Prefer': defaultPrefer} : {}),
+    ...customHeaders
+  };
+  // Remove Content-Type for GET/DELETE with no body
+  if(method==='GET'||method==='DELETE') delete headers['Content-Type'];
+  const fetchOpts = {...opts, headers};
+  if(method==='GET'||method==='DELETE') delete fetchOpts.body;
+  try{
+    const res = await fetch(SB_URL+'/rest/v1/'+path, fetchOpts);
+    const txt = await res.text();
+    if(!res.ok){
+      console.error('SB '+method+' error:', res.status, txt);
+      showToast('Erro '+res.status+': '+txt.slice(0,80));
+      throw new Error(txt);
+    }
+    try{return txt?JSON.parse(txt):[]}catch(e){return []}
+  }catch(err){
+    if(err.message && err.message.includes('fetch')){
+      showToast('Erro de conexão. Verifique a internet.');
+    }
+    throw err;
+  }
 }
 const sbGet=(table,params='')=>sbFetch(table+'?'+params);
 const sbPost=(table,body)=>sbFetch(table,{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify(body)});
@@ -658,11 +681,14 @@ async function saveEditPessoa(){
   const email=document.getElementById('edit-pessoa-email').value.trim();
   if(!nome||editEixosSel.length===0){showToast('Preencha nome e eixos.');return}
   showLoading('Salvando...');
-  await sbPatch('nd_participantes','id=eq.'+id,{nome,email:email||null,eixos:editEixosSel.slice()});
-  if(user&&user.id===id){user.name=nome;user.email=email;user.eixos=editEixosSel.slice();
-    document.getElementById('m-name').textContent=nome;document.getElementById('m-eixos').innerHTML=echHtml(editEixosSel);}
-  await loadParticipantes();buildNomeSelect();renderAdminList();
-  closeEditPessoa();hideLoading();showToast('Participante atualizada!');
+  try{
+    await sbPatch('nd_participantes','id=eq.'+id,{nome,email:email||null,eixos:editEixosSel.slice()});
+    if(user&&user.id===id){user.name=nome;user.email=email;user.eixos=editEixosSel.slice();
+      document.getElementById('m-name').textContent=nome;document.getElementById('m-eixos').innerHTML=echHtml(editEixosSel);}
+    await loadParticipantes();buildNomeSelect();renderAdminList();
+    closeEditPessoa();showToast('Participante atualizada!');
+  }catch(e){console.error('Patch error:',e);}
+  hideLoading();
 }
 function closeEditPessoa(){document.getElementById('modal-edit-pessoa').className='modal-bg'}
 
