@@ -526,9 +526,7 @@ async function loadNichos(wk){
   rows.forEach(r=>{if(!nichosDB[r.cell_key])nichosDB[r.cell_key]=[];nichosDB[r.cell_key].push(r.nome_participante)});
 }
 async function loadWeekData(wk){
-  showLoading('Atualizando escala...');
   await Promise.all([loadAbertura(wk),loadNichos(wk)]);
-  hideLoading();
 }
 
 // ── SELECT NOMES ──
@@ -833,7 +831,11 @@ async function showMain(){
   document.getElementById('m-name').textContent=user.name;
   document.getElementById('m-eixos').innerHTML=echHtml(user.eixos);
   showLoading('Carregando escala...');
-  await loadWeekData(curWk);
+  try{
+    await loadWeekData(curWk);
+  }catch(e){
+    console.error('loadWeekData error:',e);
+  }
   hideLoading();
   renderAll();
 }
@@ -852,6 +854,7 @@ function renderAll(){renderAb();renderNi();updateStats();
 
 // ── ABERTURA ──
 function renderAb(){
+  if(!user)return;
   const dates=getDayDates(curWk);
   const grid=document.getElementById('ab-grid');grid.innerHTML='';
   TURNOS.forEach(turno=>{
@@ -915,6 +918,7 @@ async function cancelAb(day,turno){
 
 // ── NICHOS ──
 function renderNi(){
+  if(!user)return;
   const grid=document.getElementById('ni-grid');grid.innerHTML='';
   ['base','expansao','sustentacao'].forEach(eixo=>{
     const grade=cronoDB[eixo]||{};
@@ -1135,7 +1139,7 @@ function closeOk(){document.getElementById('modal-ok').className='modal-bg';pend
       const uid=localStorage.getItem('last_user_id');
       if(uid){
         const p=participantesDB.find(x=>x.id===uid);
-        if(p){user={id:p.id,name:p.nome,email:p.email,eixos:p.eixos};buildWkSel();showMain();return}
+        if(p){user={id:p.id,name:p.nome,email:p.email,eixos:p.eixos};buildWkSel();await showMain();return}
       }
     }catch(e){}
     goTo('s-login');
