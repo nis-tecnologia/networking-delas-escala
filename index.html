@@ -875,6 +875,7 @@ function renderAb(){
       h+='</div>';
       if(isMe)h+='<button type="button" class="un" onclick="event.stopPropagation();cancelAb(\x27'+day+'\x27,\x27'+turno.k+'\x27)">Cancelar</button>';
       slot.innerHTML=h;blk.appendChild(slot);
+      sec.appendChild(blk);
     });
     grid.appendChild(sec);
   });
